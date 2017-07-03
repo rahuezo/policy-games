@@ -16,8 +16,8 @@ def matrix_to_network(matrix_file):
     vals = [i[1:] for i in reader[1:]]
     
     g = nx.Graph()
-    nname = matrix_file.split('/')[-1].split('.')[0]
-    
+    nname = matrix_file.replace('\\', '/').split('/')[-1].split('.')[0]
+
     for i in range(len(hor_agents)):
         for j in range(len(ver_agents)):
             try: 

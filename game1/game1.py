@@ -1,4 +1,4 @@
-from matrix_to_network import matrix_to_network as m2n2
+from matrix_to_network import matrix_to_network as m2n
 import networkx as nx
 import matplotlib.pyplot as plt
 import os
@@ -8,9 +8,14 @@ from collections import OrderedDict as OD
 from imtovid import *
 
 class Game1:
-    def __init__(self, network, main_node, rl=3, gop=0.7, animate=False):
+    def __init__(self, network, main_node, output_dir, rl=3, gop=0.7, animate=False):
         self.network = network[0]
-        self.network_name = network[1] 
+        self.network_name = network[1]
+        
+        self.infected_color = '#191970'
+        self.not_infected_color = '#92e0ec'
+        
+        self.output_dir = output_dir
         
         self.main_node = main_node # this is the main player that tries to infect the network
         self.og_node = self.main_node
@@ -245,7 +250,7 @@ class Game1:
             return [unique_history[0], unique_history]
                 
     def save_frame(self, counter, message=None):
-        images_path = "{0}_images".format(self.network_name)
+        images_path = "{0}/{1}_images".format(self.output_dir, self.network_name)
         
         if not os.path.exists(images_path):
             os.mkdir(images_path)
@@ -288,10 +293,15 @@ class Game1:
             print "\n\nInfected % = {0}%\n".format(self.infected_percentage)
             print "\n" + "*"*30
             
-            data_row = [network_name, self.rounds, self.number_of_conversions, self.number_of_like_minded, number_infected, number_uninfected, self.infected_percentage]
-        
-            with open(wd + '/' + 'game_rounds.csv', 'ab') as f:
+            header = ['Network Name', '# of Rounds', '# of Conversions', '# Like-minded Infections', '# Infected', '# Uninfected',
+                      'Infected %', ]
+            
+            data_row = [network_name, self.rounds, self.number_of_conversions, self.number_of_like_minded, number_infected, number_uninfected,
+                        self.infected_percentage]
+            
+            with open(wd + '/' + '{0}_game_rounds.csv'.format(network_name), 'wb') as f:
                 writer = csv.writer(f)
+                writer.writerow(header)
                 writer.writerow(data_row)
             
         except Exception, e:
@@ -311,9 +321,9 @@ class Game1:
                 size_map.append(50)
                 
             if infected_by == 'A':
-                color = '#191970'
+                color = self.infected_color
             else:
-                color = '#92e0ec'
+                color = self.not_infected_color
                 
             color_map.append(color)
         
@@ -376,55 +386,79 @@ class Game1:
             os.remove(img)
         
         print "\tFinished removing images"
-    
-def play_rounds(network_folder):
-    wd = network_folder + '/'
-    networks = [f for f in os.listdir(network_folder) if f.endswith('.csv') and 'game_rounds.csv' not in f]
-    
-    players_file = open(wd + '/' + 'players.txt', 'r').readlines()
-    
-    players = {}
-    
-    for player in players_file:
-        network_name = player.split(',')[0].strip()
-        player_name = player.split(',')[1].strip()
+
+
+class Environment:
+    def __init__(self, networks_dir, config_file, output_dir, animate=False, movie_duration=30):
+        self.networks_dir = networks_dir        
+        self.config_file = config_file
+        self.output_dir = output_dir
+        self.animate = animate
+        self.movie_duration = movie_duration
         
-        players[network_name] = player_name
-    
-    for n in networks:
-        network = m2n2(wd + n)
-        n_name = n.split('.')[0]
+        self.project_home = os.path.join(self.output_dir, "Game 1 Output")
+        self.images_paths = []
         
-        if n_name == 'warwick': 
-            main_node = players[n_name]
+        if not os.path.exists(self.project_home):
+            os.makedirs(self.project_home)
             
-            print "\nNetwork: {0}\tPlayer A: {1}\n".format(n_name,main_node)
-            
-            game = Game1(network, main_node, True)
-            game.play(network, main_node)
-            
-            if game.animate: 
-                make_movie('images', 30, '{0} game 1'.format(n_name))
-                print "Waiting before image deletion"
+        self.games = {}
+        
+        with open(self.config_file, 'rb') as csv_file:
+            content = csv.reader(csv_file, delimiter=",")
+        
+            for row in content:
+                network = row[0]
+                main_node = row[1]
                 
-                # time.sleep(10)
-            
-                # game.remove_images()
-                
-            for n in network.neighbors(main_node):
-                print n, network.node[n]['infected']
+                self.games[network] = main_node
         
-        # game.summary(wd, n_name)
+    def run(self):
+        for game in self.games:            
+            network_name = game.split('.')[0]
+            
+            game_output_path = os.path.join(self.project_home, "{0}_output".format(network_name))
+            
+            if not os.path.exists(game_output_path):
+                os.makedirs(game_output_path)
+                
+            img_path = "{0}/{1}_images".format(game_output_path, network_name)
+            movie_path = "{0}/{1}_video".format(game_output_path, network_name)
+            
+            self.images_paths.append(img_path)
+            
+            network = m2n(os.path.join(self.networks_dir, game))
+            main_node = self.games[game]
 
-wd = r'/home/rudyhuezo/Downloads/networks_for_game1'
-g = m2n2(r'C:\Users\Rudy\Downloads\game1/covert.csv')
+            game_instance = Game1(network, main_node, game_output_path, animate=self.animate)
+            game_instance.play()
 
-game1 = Game1(g, "Michael G. Reynolds", animate=True, gop=0.7)
-game1.play()
-game1.check_game_over()
+            game_instance.summary(game_output_path, network_name)
+            
+            if game_instance.animate == True:
+                make_movie(img_path, self.movie_duration, movie_path, network_name)
+    
+        
+# networks_dir, config_file, output_dir, animate=False, movie_duration=30
 
-# game1.summary(wd, g[1])
-make_movie('covert_images', 30, 'Covert game 1')
+# wd = r'C:\Users\Rudy\Downloads\game1'
+# env = Environment(wd, r'C:\Users\Rudy\Desktop\config.csv', r'C:\Users\Rudy\Desktop', animate=True)
+# 
+# env.run()
+
+
+
+
+
+# wd = r'/home/rudyhuezo/Downloads/networks_for_game1'
+# g = m2n(r'C:\Users\Rudy\Downloads\game1/covert.csv')
+# 
+# game1 = Game1(g, "Michael G. Reynolds", animate=True, gop=0.7)
+# game1.play()
+# game1.check_game_over()
+# 
+# # game1.summary(wd, g[1])
+# make_movie('covert_images', 30, 'Covert game 1')
 
 # nx.draw(game1.network, with_labels=True)
 # plt.show()

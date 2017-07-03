@@ -29,10 +29,12 @@ def get_frame_rate(n_images, duration):
     return fps 
 
 
-def make_movie(path_to_images, duration, output_name='output.mp4'):     
+def make_movie(path_to_images, duration, output_dir, network_name):         
+    output_name = "{0}_game1_movie".format(network_name) + '.mp4'
     
-    if not output_name.endswith('.mp4'):
-        output_name += '.mp4'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
         
     images = []
     
@@ -57,12 +59,13 @@ def make_movie(path_to_images, duration, output_name='output.mp4'):
     
     fps = get_frame_rate(n_images, duration)
     
-    print "Frame Rate: {0}".format(fps)
-    print "Movie Duration: {0}".format(float(n_images)/fps)
+    print "\n\nFrame Rate: {0}".format(fps)
+    print "Movie Duration: {0}\n\n".format(float(n_images)/fps)
     
-    out = cv2.VideoWriter(output_name, fourcc, fps, (width, height))
+    out = cv2.VideoWriter(os.path.join(output_dir, output_name), fourcc, fps, (width, height))
     
     for i in images:
+        
         im_path = os.path.join(dir_path, i)
         frame = cv2.imread(im_path)
         
